@@ -5,15 +5,515 @@
 </head>
 <body>
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://unpkg.com/d3-array@1"></script>
-  <script src="https://unpkg.com/d3-collection@1"></script>
-  <script src="https://unpkg.com/d3-path@1"></script>
-  <script src="https://unpkg.com/d3-shape@1"></script>
-  <script src="https://unpkg.com/d3-sankey@0"></script>
   <link rel="stylesheet" href="index.css" />
-  <!-- Create a div where the graph will take place -->
+  <div id="main" class="main">
+    <div class="heading">
+      Effect of Jobs and Phases on <i><b>The Omega Protocol (Ultimate)</b></i>
+    </div>
+    <div class="body">
+      <div class="row">
+        <div class="sidebar sidebar-left">
+          <div class="sidebar__heading">Description</div>
+          <div class="sidebar__text">
+            The Omega Protocol Ultimate is a hard fight in the video game Final
+            Fantasy XIV Online.
+          </div>
+          <div class="sidebar__chart"></div>
+        </div>
+        <div class="sidebar sidebar-main">
+          <div class="sidebar__heading">
+            <div class="sidebar__heading__jobdisplay" class="sidebar__heading">
+              Select a job to view data
+            </div>
+            <div class="sidebar__heading__slider">
+              <div class="sidebar__heading__slider--text">Sections: 4</div>
+              <input
+                type="range"
+                min="2"
+                max="10"
+                value="4"
+                class="slider"
+                id="sidebar__heading__slider"
+              />
+            </div>
+            <br />
+            <br />
+          </div>
+          <div class="sankey--diagram--wrapper">
+            <div class="sankeydiagram--heading"></div>
+            <div id="sankeydiagram"></div>
+          </div>
+          <div id="sankeydiagram--filter__title">
+            DRAGGABLE FILTER:<br />
+            (drag to rearrange, click to toggle)
+          </div>
+          <div id="sankeydiagram--filter"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="scatter">Huh</div>
+      </div>
+    </div>
+    <footer class="footer">
+      Made by Jayden Zhang for the final submission of the Data Visualisation
+      Project in FIT5147
+    </footer>
+  </div>
+  <div id="tooltip-container">
+    <p id="tooltip-text"></p>
+  </div>
+  <script src="d3-sankey.js"></script>
 
-  <script>
-    var sankey = d3.sankey();
+  <script type="module">
+    // Import data
+    const rawData = await d3.csv("data.csv");
+    // Job counts
+    const jobCounts = rawData.reduce((a, row) => {
+      var job = row.Job;
+      a[job] != undefined ? a[job]++ : (a[job] = 1);
+      return a;
+    }, {});
+    const phases = [1, 2, 3, 4, 5, 6];
+    let tooltip = d3.select("#tooltip-container");
+    let tooltipText = d3.select("#tooltip-text");
+    let categories = 4;
+    let job;
+
+    // Returns the role string given the job string
+    function getRole(job) {
+      const healerSet = new Set([
+        "WhiteMage",
+        "Astrologian",
+        "Scholar",
+        "Sage",
+      ]);
+      const tankSet = new Set([
+        "DarkKnight",
+        "Gunbreaker",
+        "Paladin",
+        "Warrior",
+      ]);
+      return healerSet.has(job) ? "Healer" : tankSet.has(job) ? "Tank" : "DPS";
+    }
+
+    // Refresh treemap data
+    function refreshTreemap(categories, job) {
+      const counts = rawData.reduce((a, row) => {
+        var job = row["Job"];
+        var role = getRole(job);
+        const jobInArr = a.find((d) => d.name == job);
+        const roleInArr = a.find((d) => d.name == role);
+        jobInArr != undefined
+          ? jobInArr.value++
+          : a.push({ name: job, parent: role, value: 1 });
+        roleInArr == undefined ? a.push({ name: role, parent: "Roles" }) : null;
+        return a;
+      }, []);
+
+      counts.push({ name: "Roles" });
+      console.log("COUNTS", counts);
+      let root = d3
+        .stratify()
+        .id((d) => d.name)
+        .parentId((d) => d.parent)(counts);
+
+      root.sum((d) => +d.value);
+      console.log("TREEMAP", counts);
+      console.log("RESULT", root);
+      return root;
+    }
+
+    // Append treemap to the display
+    function appendTreemap(root) {
+      // Mouseover functions for the sankey diagram
+      function treemapMouseover(nodes) {
+        nodes
+          .on("mouseover", (d) => {
+            const selectedJob = d.target.innerHTML;
+            tooltip.style("display", "block").style("visibility", "visible");
+            tooltipText.html(
+              "<b>" +
+                selectedJob +
+                "</b><br>" +
+                jobCounts[selectedJob] +
+                " clears"
+            );
+          })
+          .on("mousemove", (d) => {
+            d3.select(this).style("stroke-width", 20);
+            tooltip
+              .style("left", d.layerX + 5 + "px")
+              .style("top", d.layerY + 5 + "px");
+          })
+          .on("mouseout", (d) => {
+            tooltip.style("visibility", "hidden");
+          });
+      }
+      const margin = { top: 5, right: 5, bottom: 5, left: 5 },
+        width = 350 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+      var color = d3.scaleOrdinal(["#AA4A44", "#0096FF", "#228B22"]);
+      // Initialise tree map
+      root = d3
+        .treemap()
+        .tile(d3.treemapSquarify)
+        .size([width, height])
+        .padding(4)(root);
+
+      // Define svg
+      const svg = d3
+        .select(".sidebar-left")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+      // Generate nodes
+      const node = svg
+        .append("g")
+        .selectAll("rect")
+        .data(root.leaves())
+        .join("rect")
+        .attr("class", (d) => "treemap__node " + "treemap__node--" + d.id)
+        .attr("x", (d) => d.x0)
+        .attr("y", (d) => d.y0)
+        .attr("width", (d) => d.x1 - d.x0)
+        .attr("height", (d) => d.y1 - d.y0)
+        .attr("fill", (d) => (d.color = color(d.parent.id)));
+
+      // Generate images
+      var size = 30;
+      const circles = svg
+        .selectAll("image")
+        .data(root.leaves())
+        .join("svg:image")
+        .attr("xlink:href", (d) => "/icons/" + d.id + ".png")
+        .attr("x", (d) => d.x0 + (d.x1 - d.x0) / 2 - size / 2)
+        .attr("class", "treemap__jobicon")
+        .attr("y", (d) => d.y0 + (d.y1 - d.y0) / 2 - size / 2)
+        .attr("width", size)
+        .attr("height", size)
+        .attr("fill", "#FFFFFF");
+
+      // Implement mouseover and additiona data
+      treemapMouseover(node);
+      treemapMouseover(circles);
+      node.text((d) => d.id);
+      circles.text((d) => d.id);
+    }
+
+    // Refresh sankey data
+    function refreshSankey(categories, job, selectedPhases) {
+      var breakpoints = [];
+      var filteredData = rawData.filter((d) => d.Job == job);
+      var quadrant = filteredData.length / categories;
+      var results = [];
+      let graph = { nodes: [], links: [] };
+
+      // Generate breakpoints
+      for (var x = 0; x < selectedPhases.length; x++) {
+        const i = selectedPhases[x];
+        const phaseName = "P" + i + "DPS";
+        filteredData = filteredData.sort((a, b) => a[phaseName] - b[phaseName]);
+        // Split into x parts
+        let temp = [];
+        for (let j = 1; j < categories; j++) {
+          const lower = parseFloat(
+            filteredData[Math.ceil(j * quadrant) - 1][phaseName]
+          );
+          const upper = parseFloat(
+            filteredData[Math.ceil(j * quadrant)][phaseName]
+          );
+          temp.push((lower + upper) / 2);
+        }
+        temp.push(20000);
+        breakpoints.push(temp);
+      }
+      console.log("Breakpoints: ", breakpoints);
+
+      // Compare with breakpoints and generate links
+      for (var x = 0; x < selectedPhases.length - 1; x++) {
+        const i = selectedPhases[x];
+        const nexti = selectedPhases[x + 1];
+        const nextBreakpoints = breakpoints[x + 1];
+        const phaseName = "P" + i + "DPS";
+        // SORT CURRENT PHASE IN INCREASING ORDER
+        filteredData = filteredData.sort(
+          (a, b) => parseFloat(a[phaseName]) - parseFloat(b[phaseName])
+        );
+        for (var j = 0; j < categories; j++) {
+          // FOR EACH "QUADRANT", GENERATE LINKS
+          var slice = filteredData.slice(
+            Math.ceil(j * quadrant),
+            Math.ceil((j + 1) * quadrant)
+          );
+          var result = slice.reduce((a, row) => {
+            var nextDPS = row["P" + nexti + "DPS"];
+            for (var y = 0; y < categories + 1; y++) {
+              a[y] == undefined ? (a[y] = 0) : null;
+              if (nextDPS <= nextBreakpoints[y]) {
+                a[y] != undefined ? a[y]++ : (a[y] = 1);
+                return a;
+              }
+            }
+          }, {});
+          for (var y = Object.keys(result).length; y > 0; y--) {
+            graph.links.push({
+              source: x * categories + j,
+              target: (x + 1) * categories + y - 1,
+              value: result[y - 1],
+            });
+          }
+          results.push(result);
+        }
+      }
+      // Generate nodes
+      for (var i = 0; i < selectedPhases.length; i++) {
+        for (var j = 0; j < categories; j++) {
+          graph.nodes.push({
+            node: i * categories + j,
+            name:
+              Math.round((j * 100 * 100) / categories) / 100 +
+              " - " +
+              Math.round(((j + 1) * 100 * 100) / categories) / 100 +
+              "%",
+            phase: i,
+            quadrant: j,
+          });
+        }
+      }
+      console.log("Graph", graph);
+      console.log("Sankey values to next phase", results);
+      return graph;
+    }
+
+    // Append sankey to the display
+    function appendSankey(graph) {
+      function sankeyMouseover(nodes) {
+        nodes
+          .on("mouseover", (d) => {
+            if (d.target.tagName == "text") {
+              return;
+            }
+            const phase = d.target.id.split("-")[1];
+            const quadrant = d.target.id.split("-")[2];
+            tooltip.style("display", "block").style("visibility", "visible");
+
+            if (d.target.tagName == "path") {
+              const link = nodes
+                .filter(
+                  (x) =>
+                    x.index == +d.target.childNodes[0].innerHTML.split("_")[0]
+                )
+                .data()[0];
+              const value = d.target.childNodes[0].innerHTML.split("_")[1];
+              tooltipText.html(
+                "<b>Phase " +
+                  (+link.source.phase + 1) +
+                  " - " +
+                  link.source.name +
+                  " <br> to <br>Phase " +
+                  (+link.target.phase + 1) +
+                  " - " +
+                  link.target.name +
+                  "<br></b>" +
+                  value +
+                  " clears"
+              );
+            } else {
+              const node = nodes
+                .filter((d) => d.phase == phase && d.quadrant == quadrant)
+                .data()[0];
+              tooltipText.html(
+                "<b>Phase " +
+                  (parseInt(phase) + 1) +
+                  " - " +
+                  node.name +
+                  " </b><br>" +
+                  node.value +
+                  " clears"
+              );
+            }
+          })
+          .on("mousemove", (d) => {
+            d3.select(this).style("stroke-width", 20);
+            tooltip
+              .style("left", d.layerX + 5 + "px")
+              .style("top", d.layerY + 5 + "px");
+          })
+          .on("mouseout", (d) => {
+            tooltip.style("visibility", "hidden");
+          });
+      }
+      // set the dimensions and margins of the graph
+      const margin = { top: 10, right: 10, bottom: 10, left: 10 },
+        width = 1100 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+
+      // format variables
+      var formatNumber = d3.format(",.0f"), // zero decimal places
+        format = (d) => formatNumber(d),
+        color = d3.scaleOrdinal(d3.schemeCategory10);
+
+      // Set the sankey diagram properties
+      var sankey = d3
+        .sankey()
+        .nodeWidth(18)
+        .nodePadding(0)
+        .size([width, height]);
+      d3.selectAll(".sankeyGraph").remove();
+      graph = sankey(graph);
+      console.log(graph);
+      let svg = d3
+        .select("#sankeydiagram")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .attr("class", "sankeyGraph")
+        .style("overflow", "visible")
+        .append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+      // add in the links
+      const link = svg
+        .append("g")
+        .attr("fill", "none")
+        .attr("stroke", "#000")
+        .attr("stroke-opacity", 0.2)
+        .selectAll("path")
+        .data(graph.links)
+        .join("path")
+        .attr("d", d3.sankeyLinkHorizontal())
+        .attr("stroke-width", (d) => d.width);
+
+      // add the link titles
+      link.append("p").text((d) => d.index + "_" + d.value);
+      console.log("HUH", link.data());
+      // add in the nodes
+      const node = svg
+        .append("g")
+        .selectAll()
+        .data(graph.nodes)
+        .join("g")
+        .attr("class", "node");
+      console.log("NODES", node.data());
+      // add the rectangles for the nodes
+      node
+        .append("rect")
+        .attr("x", (d) => d.x0)
+        .attr("y", (d) => d.y0)
+        .attr("height", (d) => d.y1 - d.y0)
+        .attr("width", sankey.nodeWidth())
+        .style("fill", (d) => (d.color = color(d.name)))
+        .style("stroke", (d) => d3.rgb(d.color).darker(2))
+        .attr("class", "sankey__node")
+        .attr("id", (d) => "sankey__node-" + d.phase + "-" + d.quadrant);
+
+      // add in the title for the nodes
+      node
+        .filter((d) => d.phase == 0)
+        .append("text")
+        .attr("x", (d) => d.x0 - 5)
+        .attr("y", (d) => (d.y1 + d.y0) / 2)
+        .attr("text-anchor", "end")
+        .text((d) => d.name);
+
+      sankeyMouseover(node);
+      sankeyMouseover(link);
+    }
+
+    // Get filtered phases
+    function getFilteredPhases() {
+      const selectedPhases = d3
+        .selectAll(".sankeydiagram--filter__items")
+        .nodes()
+        .map((d) => d.outerText);
+      const nonSelectedPhases = d3
+        .selectAll(".sankeydiagram--filter__items--disabled ")
+        .nodes()
+        .map((d) => d.outerText);
+      return selectedPhases
+        .filter((x) => !nonSelectedPhases.includes(x))
+        .map((d) => parseInt(d.slice(-1)));
+    }
+
+    // Updates the Sankey diagram
+    function updateSankey() {
+      let graph = refreshSankey(categories, job, getFilteredPhases());
+      appendSankey(graph);
+      return graph;
+    }
+
+    // Updates the heading of the Sankey diagram
+    function updateSankeyHeading() {
+      const phases = getFilteredPhases();
+      d3.selectAll(".sankeydiagram--heading--label").remove();
+      let hmm = d3
+        .select(".sankeydiagram--heading")
+        .attr(
+          "style",
+          "width: " + (1060 * phases.length) / (phases.length - 1) + "px"
+        )
+        .selectAll()
+        .data(phases)
+        .join("div")
+        .attr("class", "sankeydiagram--heading--label")
+        .attr("id", (d) => "sankeydiagram--heading--label-" + d)
+        .text((d) => "P" + d);
+    }
+
+    // Append treemap
+    let treemapData = refreshTreemap();
+    appendTreemap(treemapData);
+
+    // Add draggable filter
+    d3.select("#sankeydiagram--filter")
+      .selectAll("div")
+      .data(phases)
+      .join("div")
+      .attr("class", "sankeydiagram--filter__items")
+      .text((d) => "P" + d);
+
+    d3.select("#sidebar__heading__slider").on("input", (d) => {
+      categories = d.target.value;
+      d3.select(".sidebar__heading__slider--text").text(
+        (d) => "Sections: " + categories
+      );
+      updateSankey();
+    });
+
+    // Handle draggable filter clickability
+    d3.selectAll(".sankeydiagram--filter__items").on("click", (d) => {
+      d3.select(d.target).classed(
+        "sankeydiagram--filter__items--disabled",
+        !d3.select(d.target).classed("sankeydiagram--filter__items--disabled")
+      );
+
+      updateSankeyHeading();
+      updateSankey();
+    });
+
+    // Handles job selecting on each box + icon + adds border
+    d3.selectAll(".treemap__node,.treemap__jobicon").on("click", (d) => {
+      job = d.target.innerHTML;
+      let graph = updateSankey();
+
+      d3.selectAll(".node").on("click", (d) => {
+        const result = d.target.id.split("-");
+        const phase = result[1];
+        const category = result[2];
+        let filteredData = rawData.filter((d) => d.Job == job);
+        console.log(graph, phase, category);
+      });
+
+      d3.select("#sidebar__heading__jobdisplay").text(job + ": ");
+      d3.selectAll(".treemap__node").classed("treemapNode--selected", false);
+      d3.select(".treemap__node--" + job).classed(
+        "treemapNode--selected",
+        true
+      );
+    });
+
+    updateSankeyHeading();
   </script>
 </body>

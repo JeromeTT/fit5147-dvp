@@ -1,0 +1,120 @@
+.main {
+    background-color: lightgreen;
+    width: 1600px;
+    height: auto;
+    margin: auto;
+    font-family:Arial, Helvetica, sans-serif;
+    padding: 10px;
+}
+
+.heading {
+    font-size: 35px;
+    text-align: center;
+    background-color: white;
+    padding: 10px;
+}
+.row {
+    display:flex;
+}
+
+/* Sidebar */
+
+.sidebar {
+    padding: 10px
+}
+
+.sidebar-left {
+    background-color: pink;
+    width:360px;
+}
+
+.sidebar-main {
+    background-color: grey;
+    width: 1100px;
+    flex-grow: 1;
+}
+
+.sidebar__heading {
+    font-size: 30px;
+}
+
+.sidebar__heading__slider{
+    float:right;
+}
+
+.sidebar__heading__jobdisplay{
+    float:left;
+}
+
+.footer {
+    padding: 10px 0 0 0;
+    text-align: center;
+}
+
+/* Treemap */
+.treemapNode--selected {
+    stroke:black;
+    stroke-width: 5px;
+}
+
+/* Sankey */
+#sankeydiagram {
+    height:600px
+}
+
+#sankeydiagram--filter{
+    text-align: center;
+    display:flex;
+}
+
+#sankeydiagram--filter__title{
+    width: 100%;
+    flex-grow: 1;
+}
+
+.sankeydiagram--filter__items {
+    width:16.66%;
+    background-color: white;
+}
+.sankeydiagram--filter__items--disabled {
+    background-color: grey;
+}
+
+.sankey--diagram--wrapper {
+    margin: 0px 0px 0px 100px;
+}
+
+.sankeydiagram--heading {
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    width:1413px
+}
+
+.sankeydiagram--heading--label{
+    text-align: left;
+    font-size: 20px;
+    padding: 10px
+}
+.scatter{
+    background-color:aquamarine;
+    width:100%;
+    height:500px
+}
+
+/* Tooltips */
+#tooltip-container {
+    position: absolute;
+    background-color: white;
+    padding: 0px 15px 0px 15px;
+    display: none;
+    border: 1px solid #555;
+  }
+
+#tooltip-text {
+    font-family:Arial, Helvetica, sans-serif;
+}
+
+.linebreak {
+    border: 2px solid white;
+}
